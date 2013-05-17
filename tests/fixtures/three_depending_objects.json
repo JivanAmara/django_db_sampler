@@ -1,0 +1,23 @@
+[
+    {
+        "pk": 1, 
+        "model": "db_sampler.class3", 
+        "fields": {
+            "nodep": null
+        }
+    }, 
+    {
+        "pk": 1, 
+        "model": "db_sampler.class2", 
+        "fields": {
+            "dep2": 1
+        }
+    }, 
+    {
+        "pk": 1, 
+        "model": "db_sampler.class1", 
+        "fields": {
+            "dep1": 1
+        }
+    }
+]

@@ -1,0 +1,65 @@
+This python module was written to help create database fixtures from an existing
+database that is too large to simply dump it in its entirety.
+Thanks to Jacob Rigby, Technical lead at Reya Group (http://www.reya.com)
+for his unhesitating agreement to release this to the open source community.
+
+The process copies the desired model instances to a separate database
+along with their dependencies, and optionally children (instances dependent on
+them).  You can then dump the other database to get a minimal fixture
+for your test case.
+
+Quick Reference:
+def db_sample(
+	db_obj_iterable,	# Iterable containing Django model instances
+	child_depth=1, 		# Set this to 2+ to also include children of children
+	db_alias='fixture_maker' # If you really need to use a different alias you can.
+)
+
+First use:
+    1. Add a database 'fixture_maker' to your settings file pointing to a
+    database with a different name from your default database.  Add
+        "'TEST_MIRROR': 'default'" to the fixture_maker database settings
+    to prevent the new database from being created during tests.
+    
+    2. Create the database pointed to by alias fixture_maker (This step can be skipped
+    if you're using sqlite, as it will automatically create the database when
+    sync'd)
+
+    3. Run 'python manage.py syncdb --database=fixture_maker'.
+    	*note I've run into some trouble with South, syncdb, and the --database
+    		flag.  If you're using south, you can work around this:
+    		Move your default database, do a 'syncdb --migrate' then rename
+    		the resulting new default database as
+    		the fixture maker database then move your original default database back.
+
+    4. Pass an iterable containing django model instances to db_sample().
+    	This Example will save all the Pizza instances with olive topping to the
+    	fixture_maker database with their dependencies and by default children to
+    	1 level deep:
+
+    	from db_sampler_script import db_sample
+    	
+    	p = Pizza.objects.filter(toppings__type='olive')
+    	db_sample(p)
+    5. Run 'python manage.py dumpdata --database=fixture_maker > your_new_fixture'
+    
+    Enjoy.
+
+Subsequent use:
+    Skip steps 1 & 2, and replace step 3 with:
+    'python manage.py flush --database=fixture_maker'
+    Be careful not to run this command without the --database flag, lest
+    you erase your entire default database.
+
+Assumptions:
+    Primary key for models is obj.id, if you've changed this for some models,
+    	please let me know how it blows up.
+    Foreign keys don't form loops (an object reference an object which eventually
+        references the first).  This is very rarely needed, and many databases
+        make it difficult, so if you're not sure don't worry about it.
+        If you have some loops like these and genuinely need them, let me know &
+        I'll update the code to deal with it.
+    Foreign keys that aren't NULL are assumed to be required for database
+        consistency.  At worst this will add some model instances to the resulting
+        fixture that aren't really needed.  Unless someone contacts me about
+        this causing a real problem, it will likely stay like this.

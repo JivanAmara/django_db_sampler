@@ -1,0 +1,102 @@
+[
+    {
+        "pk": 1, 
+        "model": "db_sampler.class3", 
+        "fields": {
+            "nodep": null
+        }
+    }, 
+    {
+        "pk": 1, 
+        "model": "db_sampler.class2", 
+        "fields": {
+            "dep2": 1
+        }
+    }, 
+    {
+        "pk": 1, 
+        "model": "db_sampler.class1", 
+        "fields": {
+            "dep1": 1
+        }
+    }, 
+    {
+        "pk": 1, 
+        "model": "db_sampler.bm2m1", 
+        "fields": {
+            "m2m": []
+        }
+    }, 
+    {
+        "pk": 2, 
+        "model": "db_sampler.bm2m1", 
+        "fields": {
+            "m2m": [
+                1
+            ]
+        }
+    }, 
+    {
+        "pk": 3, 
+        "model": "db_sampler.bm2m1", 
+        "fields": {
+            "m2m": [
+                1, 
+                2
+            ]
+        }
+    }, 
+    {
+        "pk": 4, 
+        "model": "db_sampler.bm2m1", 
+        "fields": {
+            "m2m": [
+                1, 
+                2, 
+                3
+            ]
+        }
+    }, 
+    {
+        "pk": 1, 
+        "model": "db_sampler.bm2m2", 
+        "fields": {
+            "attr": null
+        }
+    }, 
+    {
+        "pk": 2, 
+        "model": "db_sampler.bm2m2", 
+        "fields": {
+            "attr": null
+        }
+    }, 
+    {
+        "pk": 3, 
+        "model": "db_sampler.bm2m2", 
+        "fields": {
+            "attr": null
+        }
+    }, 
+    {
+        "pk": 1, 
+        "model": "db_sampler.tm2m1", 
+        "fields": {}
+    }, 
+    {
+        "pk": 1, 
+        "model": "db_sampler.tm2m2", 
+        "fields": {
+            "attr": null
+        }
+    }, 
+    {
+        "pk": 1, 
+        "model": "db_sampler.throughtable", 
+        "fields": {
+            "m2m2": 1, 
+            "m2m1": 1, 
+            "extra_info": null
+        }
+    }
+]
