@@ -25,7 +25,7 @@ First use:
     if you're using sqlite, as it will automatically create the database when
     sync'd)
 
-    3. Run 'python manage.py syncdb --database=fixture_maker'.
+    3. Run 'python manage.py syncdb --migrate --database=fixture_maker'.
     	*note I've run into some trouble with South, syncdb, and the --database
     		flag.  If you're using south, you can work around this:
     		Move your default database, do a 'syncdb --migrate' then rename

@@ -40,7 +40,14 @@
 from __future__ import print_function, unicode_literals, division
 from django.db.models.fields.related import ManyToOneRel, OneToOneRel, \
     ManyToManyRel
-    
+from django.contrib.contenttypes.generic import GenericRelation
+import re
+import logging
+logfilename = 'make_fixture.log'
+logging.basicConfig(filename=logfilename,level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.info('Loaded db_sampler_script')
+
 def identify_dependencies(django_model_instance):
     """ @brief Lists the django model instances that \a django_model_instance
             depends on either directly or indirectly.
@@ -95,7 +102,9 @@ def identify_simple_children(django_model_instance, depth=1):
         dmobj = django_model_instance
         children = list()
         # Get the attributes of this model instance with their names
-        for related_object in dmobj._meta.get_all_related_objects():
+        related_objs = dmobj._meta.get_all_related_objects()
+        
+        for related_object in related_objs:
             try:
                 related_name = related_object.get_accessor_name()
                 relationship = related_object.field.rel
@@ -107,10 +116,18 @@ def identify_simple_children(django_model_instance, depth=1):
                 continue
             
             # We're not interested in ManyToMany relationships here.
-            if relationship == ManyToManyRel:
+            relationship_type = type(relationship)
+            if relationship_type == ManyToManyRel:
                 continue
-
-            for child in related.all():
+            elif relationship_type == OneToOneRel:
+                new_children =  [related]
+            elif relationship_type == ManyToOneRel:
+                new_children = related.all()
+            else:
+                raise Exception('Unexpected relationship type: {} (not {}, {}, {}'\
+                                    .format(relationship_type, ManyToManyRel, OneToOneRel, ManyToOneRel))
+            
+            for child in new_children:
                 children.append(child)
                 children.extend(identify_simple_children(child, depth=depth-1))
 
@@ -131,7 +148,8 @@ def identify_basic_m2m_children(django_model_instance):
     related_m2m_objects = dict()
 
     for m2m_field in dmobj._meta.many_to_many:
-        if not m2m_field.rel.through._meta.auto_created:
+        rel_type = type(m2m_field)
+        if rel_type != GenericRelation and not m2m_field.rel.through._meta.auto_created:
             continue
 
         field_name = m2m_field.name
@@ -153,7 +171,8 @@ def identify_through_m2m_children(django_model_instance):
     through_m2m_objects = list()
 
     for m2m_field in dmobj._meta.many_to_many:
-        if m2m_field.rel.through._meta.auto_created:
+        rel_type = type(m2m_field)
+        if rel_type == GenericRelation or m2m_field.rel.through._meta.auto_created:
             continue
 
         related_objects = getattr(dmobj, m2m_field.name).all()
@@ -195,7 +214,7 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
     # Save dependencies.
     for dep in dependencies:
         dep.save(using=db_alias)
-    
+
     # Save object
     obj.save(using=db_alias)
 
