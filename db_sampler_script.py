@@ -41,7 +41,9 @@ from __future__ import print_function, unicode_literals, division
 from django.db.models.fields.related import ManyToOneRel, OneToOneRel, \
     ManyToManyRel
 from django.contrib.contenttypes.generic import GenericRelation
+from django.contrib.contenttypes.models import ContentType
 import re
+import traceback
 import logging
 logfilename = 'make_fixture.log'
 logging.basicConfig(filename=logfilename,level=logging.DEBUG)
@@ -213,9 +215,34 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
 
     # Save dependencies.
     for dep in dependencies:
-        dep.save(using=db_alias)
+        try:
+            if type(dep) == ContentType:
+                try:
+                    existing_ct = ContentType.objects.get(app_label=dep.app_label, model=dep.model)
+                    if dep.id != existing_ct.id:
+                        dep.id = existing_ct.id
+                        msg = 'Existing ContentType with id {} matches ContentType with id {}\n'\
+                              'application={}, model={}'\
+                                  .format(existing_ct.id, dep.id, dep.app_label, dep.model)
+                        logger.warn(msg)
+                except ContentType.DoesNotExist:
+                    pass
 
-    # Save object
+            msg = '{} (pk: {})'.format(obj.__class__.__name__, obj.pk)
+            logger.info(msg)
+            dep.save(using=db_alias)
+        except BaseException as e:
+            msg = 'An exception occurred while trying to save a dependency object.\n'\
+                  "We'll attempt to continue without saving this object.\n"\
+                  'The object we were attempting to save was a {}:\n{} (id:{})\n'\
+                  "It's contents (dir(object)) are:\n{}\n"\
+                  'The stack trace for the error is:\n{}'\
+                       .format(type(dep), dep, dep.id, dir(object), traceback.format_exc())
+            logger.error(msg)
+            pass
+
+    msg = '{} (pk: {})'.format(obj.__class__.__name__, obj.pk)
+    logger.info(msg)
     obj.save(using=db_alias)
 
     if child_depth > 0:
@@ -242,4 +269,7 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
 
 def db_sample(db_obj_iterable, child_depth=1, db_alias='fixture_maker'):
     for obj in db_obj_iterable:
+        at_least_one_object = True
         sample_object(obj, child_depth=child_depth, db_alias=db_alias)
+    if not at_least_one_object:
+        logger.warn('No objects were requested for sampling.  Did you want an empty fixture?')
