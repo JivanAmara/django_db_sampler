@@ -190,6 +190,9 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
             # A lot of objects are getting saved multiple times.
 
     """
+    if not hasattr(sample_object, 'already_saved'):
+        sample_object.already_saved = set()
+
     # Object's dependencies, the objects that this object has a foreign key to
     #    either directly or indirectly.
     dependencies = identify_dependencies(obj)
@@ -217,6 +220,7 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
     for dep in dependencies:
         try:
             if type(dep) == ContentType:
+                pass
                 try:
                     existing_ct = ContentType.objects.get(app_label=dep.app_label, model=dep.model)
                     if dep.id != existing_ct.id:
@@ -228,22 +232,27 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
                 except ContentType.DoesNotExist:
                     pass
 
-            msg = '{} (pk: {})'.format(obj.__class__.__name__, obj.pk)
-            logger.info(msg)
-            dep.save(using=db_alias)
+            if (dep.__class__.__name__, dep.pk) not in sample_object.already_saved:
+                dep.save(using=db_alias)
+                sample_object.already_saved.add((dep.__class__.__name__, dep.pk))
+                msg = '{} (pk: {})'.format(dep.__class__.__name__, dep.pk)
+                logger.info(msg)
+
         except BaseException as e:
             msg = 'An exception occurred while trying to save a dependency object.\n'\
                   "We'll attempt to continue without saving this object.\n"\
                   'The object we were attempting to save was a {}:\n{} (id:{})\n'\
                   "It's contents (dir(object)) are:\n{}\n"\
                   'The stack trace for the error is:\n{}'\
-                       .format(type(dep), dep, dep.id, dir(object), traceback.format_exc())
+                       .format(dep.__class__.__name__, dep, dep.id, dir(object), traceback.format_exc())
             logger.error(msg)
             pass
 
-    msg = '{} (pk: {})'.format(obj.__class__.__name__, obj.pk)
-    logger.info(msg)
-    obj.save(using=db_alias)
+    if (obj.__class__.__name__, obj.pk) not in sample_object.already_saved:
+        obj.save(using=db_alias)
+        sample_object.already_saved.add((obj.__class__.__name__, obj.pk))
+        msg = '{} (pk: {})'.format(obj.__class__.__name__, obj.pk)
+        logger.info(msg)
 
     if child_depth > 0:
         # Save object's simple children.
@@ -255,8 +264,11 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
             for child in children:
                 sample_object(child, child_depth=child_depth-1, db_alias=db_alias)
             # Connect the children to the object
-            getattr(obj, field_name).add(*children)
-
+            try:
+                getattr(obj, field_name).add(*children)
+            except UnicodeDecodeError as e:
+                logger.error('Problem with {}.{}'.format(obj.__class__.__name__, field_name))
+                raise
         # Save object's custom-through m2m children.
         for tm2mc in through_m2m_children:
             sample_object(tm2mc, child_depth=child_depth-1, db_alias=db_alias)
