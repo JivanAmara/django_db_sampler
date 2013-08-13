@@ -232,7 +232,11 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
                 except ContentType.DoesNotExist:
                     pass
 
-            if (dep.__class__.__name__, dep.pk) not in sample_object.already_saved:
+            # If this model instance isn't already saved to the fixture database,
+            #    or it's saved to the fixture database, but has been retrieved 
+            #    again from the original database through another object.
+            if (dep.__class__.__name__, dep.pk) not in sample_object.already_saved \
+                or dep._state.db != db_alias:
                 dep.save(using=db_alias)
                 sample_object.already_saved.add((dep.__class__.__name__, dep.pk))
                 msg = '{} (pk: {})'.format(dep.__class__.__name__, dep.pk)
@@ -269,6 +273,7 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
             except UnicodeDecodeError as e:
                 logger.error('Problem with {}.{}'.format(obj.__class__.__name__, field_name))
                 raise
+
         # Save object's custom-through m2m children.
         for tm2mc in through_m2m_children:
             sample_object(tm2mc, child_depth=child_depth-1, db_alias=db_alias)
