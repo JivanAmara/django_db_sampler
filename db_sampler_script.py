@@ -252,7 +252,8 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
             logger.error(msg)
             pass
 
-    if (obj.__class__.__name__, obj.pk) not in sample_object.already_saved:
+    if (obj.__class__.__name__, obj.pk) not in sample_object.already_saved \
+        or obj._state.db != db_alias:
         obj.save(using=db_alias)
         sample_object.already_saved.add((obj.__class__.__name__, obj.pk))
         msg = '{} (pk: {})'.format(obj.__class__.__name__, obj.pk)
@@ -267,12 +268,19 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
         for field_name, children in basic_m2m_children.items():
             for child in children:
                 sample_object(child, child_depth=child_depth-1, db_alias=db_alias)
+            
             # Connect the children to the object
-            try:
-                getattr(obj, field_name).add(*children)
-            except UnicodeDecodeError as e:
-                logger.error('Problem with {}.{}'.format(obj.__class__.__name__, field_name))
-                raise
+            for child in children:
+                try:
+                    getattr(obj, field_name).add(child)
+                except ValueError as e:
+                    print("Can't add {}:{} to {}:{}.{} -- parent is on {}, child is on {}"\
+                            .format(child.__class__.__name__, child.id,
+                                    obj.__class__.__name__, obj.id, field_name,
+                                    obj._state.db, child._state.db))
+                except UnicodeDecodeError as e:
+                    logger.error('Problem with {}.{}'.format(obj.__class__.__name__, field_name))
+                    raise
 
         # Save object's custom-through m2m children.
         for tm2mc in through_m2m_children:
