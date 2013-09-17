@@ -45,6 +45,8 @@ from django.contrib.contenttypes.models import ContentType
 import re
 import traceback
 import logging
+import sys
+
 logfilename = 'make_fixture.log'
 logging.basicConfig(filename=logfilename,level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -185,7 +187,7 @@ def identify_through_m2m_children(django_model_instance):
 
     return (related_m2m_objects, through_m2m_objects)
 
-def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
+def sample_object(obj, child_depth=1, db_alias='fixture_maker', show_progress=False):
     """
             # A lot of objects are getting saved multiple times.
 
@@ -237,6 +239,9 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
             #    again from the original database through another object.
             if (dep.__class__.__name__, dep.pk) not in sample_object.already_saved \
                 or dep._state.db != db_alias:
+                if show_progress:
+                    sys.stdout.write('.')
+                    sys.stdout.flush()
                 dep.save(using=db_alias)
                 sample_object.already_saved.add((dep.__class__.__name__, dep.pk))
                 msg = '{} (pk: {})'.format(dep.__class__.__name__, dep.pk)
@@ -254,6 +259,9 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
 
     if (obj.__class__.__name__, obj.pk) not in sample_object.already_saved \
         or obj._state.db != db_alias:
+        if show_progress:
+            sys.stdout.write('.')
+            sys.stdout.flush()
         obj.save(using=db_alias)
         sample_object.already_saved.add((obj.__class__.__name__, obj.pk))
         msg = '{} (pk: {})'.format(obj.__class__.__name__, obj.pk)
@@ -292,9 +300,21 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker'):
         for tm2ml in through_m2m_links:
             sample_object(tm2ml, child_depth=0, db_alias=db_alias)
 
-def db_sample(db_obj_iterable, child_depth=1, db_alias='fixture_maker'):
+def db_sample(db_obj_iterable, child_depth=1, db_alias='fixture_maker', show_progress=False):
+    at_least_one_object = False
+    if show_progress:
+        output_description = """
+            O = top-level object being sampled.
+            . = top-level object dependency being saved.
+        """
+        print("Sampling {} objects".format(len(db_obj_iterable)))
+        print(output_description)
+
     for obj in db_obj_iterable:
         at_least_one_object = True
-        sample_object(obj, child_depth=child_depth, db_alias=db_alias)
+        if show_progress:
+            sys.stdout.write('O')
+            sys.stdout.flush()
+        sample_object(obj, child_depth=child_depth, db_alias=db_alias, show_progress=show_progress)
     if not at_least_one_object:
         logger.warn('No objects were requested for sampling.  Did you want an empty fixture?')
