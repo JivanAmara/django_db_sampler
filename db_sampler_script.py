@@ -52,7 +52,7 @@ logging.basicConfig(filename=logfilename,level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.info('Loaded db_sampler_script')
 
-def identify_dependencies(django_model_instance):
+def identify_dependencies(django_model_instance, show_progress=False):
     """ @brief Lists the django model instances that \a django_model_instance
             depends on either directly or indirectly.
 
@@ -86,7 +86,7 @@ def identify_dependencies(django_model_instance):
             # Make sure its dependencies appear in the list before it does.
             deps.extend(identify_dependencies(obj))
             deps.append(obj)
-    
+
     return deps
 
 def identify_simple_children(django_model_instance, depth=1):
@@ -197,26 +197,26 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker', show_progress=Fa
 
     # Object's dependencies, the objects that this object has a foreign key to
     #    either directly or indirectly.
-    dependencies = identify_dependencies(obj)
+    dependencies = identify_dependencies(obj, show_progress=show_progress)
 
-    # If we're getting the objects related children as well,
-    if child_depth > 0:
-        # Simple children are models with a foreign key to obj.
-        simple_children = identify_simple_children(obj)
-        
-        # Basic m2m children are models linked with a m2m relationship that
-        #    uses a Django-managed linking table, rather than a custom table
-        #    using the 'through' parameter.
-        # For this type of m2m relationship, we need to save the children, then
-        #    add them to the relationship.
-        basic_m2m_children = identify_basic_m2m_children(obj)
-
-        # Through m2m children are models linked with a custom 'through' model.
-        #    For this type of m2m relationship, we need to manually save both the
-        #    children and
-        #    the link objects.
-        through_m2m_children, through_m2m_links = \
-            identify_through_m2m_children(obj)
+#     # If we're getting the objects related children as well,
+#     if child_depth > 0:
+#         # Simple children are models with a foreign key to obj.
+#         simple_children = identify_simple_children(obj)
+#
+#         # Basic m2m children are models linked with a m2m relationship that
+#         #    uses a Django-managed linking table, rather than a custom table
+#         #    using the 'through' parameter.
+#         # For this type of m2m relationship, we need to save the children, then
+#         #    add them to the relationship.
+#         basic_m2m_children = identify_basic_m2m_children(obj)
+#
+#         # Through m2m children are models linked with a custom 'through' model.
+#         #    For this type of m2m relationship, we need to manually save both the
+#         #    children and
+#         #    the link objects.
+#         through_m2m_children, through_m2m_links = \
+#             identify_through_m2m_children(obj)
 
     # Save dependencies.
     for dep in dependencies:
@@ -267,38 +267,38 @@ def sample_object(obj, child_depth=1, db_alias='fixture_maker', show_progress=Fa
         msg = '{} (pk: {})'.format(obj.__class__.__name__, obj.pk)
         logger.info(msg)
 
-    if child_depth > 0:
-        # Save object's simple children.
-        for sc in simple_children:
-            sample_object(sc, child_depth=child_depth-1, db_alias=db_alias)
-    
-        # Save object's basic m2m children.
-        for field_name, children in basic_m2m_children.items():
-            for child in children:
-                sample_object(child, child_depth=child_depth-1, db_alias=db_alias)
-            
-            # Connect the children to the object
-            for child in children:
-                try:
-                    getattr(obj, field_name).add(child)
-                except ValueError as e:
-                    print("Can't add {}:{} to {}:{}.{} -- parent is on {}, child is on {}"\
-                            .format(child.__class__.__name__, child.id,
-                                    obj.__class__.__name__, obj.id, field_name,
-                                    obj._state.db, child._state.db))
-                except UnicodeDecodeError as e:
-                    logger.error('Problem with {}.{}'.format(obj.__class__.__name__, field_name))
-                    raise
-
-        # Save object's custom-through m2m children.
-        for tm2mc in through_m2m_children:
-            sample_object(tm2mc, child_depth=child_depth-1, db_alias=db_alias)
-    
-        # Save object's custom-through model entries.  (Children can be ignored
-        #    since the table is only performing a mapping function and isn't
-        #    accessed as a child of this object.)
-        for tm2ml in through_m2m_links:
-            sample_object(tm2ml, child_depth=0, db_alias=db_alias)
+#     if child_depth > 0:
+#         # Save object's simple children.
+#         for sc in simple_children:
+#             sample_object(sc, child_depth=child_depth-1, db_alias=db_alias)
+#
+#         # Save object's basic m2m children.
+#         for field_name, children in basic_m2m_children.items():
+#             for child in children:
+#                 sample_object(child, child_depth=child_depth-1, db_alias=db_alias)
+#
+#             # Connect the children to the object
+#             for child in children:
+#                 try:
+#                     getattr(obj, field_name).add(child)
+#                 except ValueError as e:
+#                     print("Can't add {}:{} to {}:{}.{} -- parent is on {}, child is on {}"\
+#                             .format(child.__class__.__name__, child.id,
+#                                     obj.__class__.__name__, obj.id, field_name,
+#                                     obj._state.db, child._state.db))
+#                 except UnicodeDecodeError as e:
+#                     logger.error('Problem with {}.{}'.format(obj.__class__.__name__, field_name))
+#                     raise
+#
+#         # Save object's custom-through m2m children.
+#         for tm2mc in through_m2m_children:
+#             sample_object(tm2mc, child_depth=child_depth-1, db_alias=db_alias)
+#
+#         # Save object's custom-through model entries.  (Children can be ignored
+#         #    since the table is only performing a mapping function and isn't
+#         #    accessed as a child of this object.)
+#         for tm2ml in through_m2m_links:
+#             sample_object(tm2ml, child_depth=0, db_alias=db_alias)
 
 def db_sample(db_obj_iterable, child_depth=1, db_alias='fixture_maker', show_progress=False):
     at_least_one_object = False
